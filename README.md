@@ -1,6 +1,6 @@
-# 🌟 MotivationMate
+# 🌟 Motivo
 
-MotivationMate is a Flutter-based mobile app that delivers **daily motivational quotes** to users based on their selected category — helping them stay inspired and focused every day.  
+Motivo is a Flutter-based mobile app that delivers **daily motivational quotes** to users based on their selected category — helping them stay inspired and focused every day.  
 
 ## ✨ Features
 

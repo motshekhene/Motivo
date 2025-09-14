@@ -1,8 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-void main() {
+
+import 'package:flutter/cupertino.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyD_m0cEiE3SEFOu9SEk-7vQ_vdbkFQ4WII",
+      appId: "1:14753296809:android:af322b820b43bcdc5f94b8",
+      messagingSenderId: "14753296809",
+      projectId: "motivo-35d26",
+      storageBucket: "motivo-35d26.firebasestorage.app",
+    ),
+  );
+
   runApp(const MotivoApp());
 }
 
@@ -369,7 +389,7 @@ class _ThirdPageState extends State<ThirdPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => const FourthPage()),
+                                builder: (context) => FourthPage(category: goals[selectedIndex!])),
                           );
                         },
                   child: const Text("Next"),
@@ -387,7 +407,8 @@ class _ThirdPageState extends State<ThirdPage> {
 // (Repeat same expanded pattern as above)
 
 class FourthPage extends StatefulWidget {
-  const FourthPage({super.key});
+  final String category;
+  const FourthPage({super.key, required this.category});
 
   @override
   State<FourthPage> createState() => _FourthPageState();
@@ -464,6 +485,7 @@ class _FourthPageState extends State<FourthPage> {
                         MaterialPageRoute(
                             builder: (context) =>  FifthPage(
                               username: _usernameController.text.trim(),
+                              category: widget.category,
                             
                       ),
                         ),
@@ -486,8 +508,9 @@ class _FourthPageState extends State<FourthPage> {
 
 class FifthPage extends StatelessWidget {
   final String username;
+  final String category;
 
-  const FifthPage({super.key,required this.username});
+  const FifthPage({super.key,required this.username, required this.category});
 
   @override
   Widget build(BuildContext context) {
@@ -519,13 +542,18 @@ class FifthPage extends StatelessWidget {
               ),
               const SizedBox(height: 30),
               ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const NotificationTimeScreen()),
-                ),
-                child: const Text("Set Notification Time"),
-              ),
+  onPressed: () => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => NotificationTimeScreen(
+        username: username,
+        category: category,
+      ),
+    ),
+  ),
+  child: const Text("Set Notification Time"),
+),
+
             ],
           ),
         ),
@@ -538,7 +566,10 @@ class FifthPage extends StatelessWidget {
 
 
 class NotificationTimeScreen extends StatefulWidget {
-  const NotificationTimeScreen({super.key});
+  final String username;
+  final String category;
+
+  const NotificationTimeScreen({super.key, required this.username, required this.category});
 
   @override
   State<NotificationTimeScreen> createState() => _NotificationTimeScreenState();
@@ -553,58 +584,309 @@ class _NotificationTimeScreenState extends State<NotificationTimeScreen> {
       appBar: AppBar(
         title: const Text("Set Notification Time"),
         backgroundColor: MotivoApp.primary,
-        foregroundColor: Colors.white,
-        centerTitle: true,
       ),
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Text(
-              "Select what time you want to receive your daily motivation:",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-            ),
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    SizedBox(
+      height: 200, // give it a fixed height
+      child: CupertinoDatePicker(
+        mode: CupertinoDatePickerMode.time,
+        initialDateTime: DateTime(
+            2025, 1, 1, selectedTime.hour, selectedTime.minute),
+        use24hFormat: true,
+        onDateTimeChanged: (DateTime newDateTime) {
+          setState(() {
+            selectedTime = TimeOfDay(
+              hour: newDateTime.hour,
+              minute: newDateTime.minute,
+            );
+          });
+        },
+      ),
+    ),
+    const SizedBox(height: 30),
+    ElevatedButton(
+  onPressed: () async {
+    try {
+      // Save notification time to Firestore
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(widget.username)
+          .set({
+        "username": widget.username,
+        "category": widget.category,
+        "hour": selectedTime.hour,
+        "minute": selectedTime.minute,
+        "streak": 0, // initialize daily streak
+      });
+
+      // Show a confirmation SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              "Motivation time set to ${selectedTime.format(context)}"),
+          backgroundColor: MotivoApp.primary,
+        ),
+      );
+
+      // Navigate to the interactive MotivationSetupPage
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MotivationSetupPage(
+            username: widget.username,
+            category: widget.category,
+            notificationTime: selectedTime,
           ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error saving data: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  },
+  child: const Text("Save"),
+),
 
-          // 🕒 Cupertino-style scroll wheel picker
-          SizedBox(
-            height: 200,
-            child: CupertinoDatePicker(
-              mode: CupertinoDatePickerMode.time,
-              initialDateTime: DateTime(2025, 1, 1, selectedTime.hour,
-                  selectedTime.minute), // default time
-              use24hFormat: true, // set to false if you want AM/PM
-              onDateTimeChanged: (DateTime newDateTime) {
-                setState(() {
-                  selectedTime = TimeOfDay(
-                    hour: newDateTime.hour,
-                    minute: newDateTime.minute,
-                  );
-                });
-              },
-            ),
+  ],
+),
+
+    );
+  }
+}
+class MotivationSetupPage extends StatefulWidget {
+  final String username;
+  final String category;
+  final TimeOfDay notificationTime;
+
+  const MotivationSetupPage({
+    super.key,
+    required this.username,
+    required this.category,
+    required this.notificationTime,
+  });
+
+  @override
+  State<MotivationSetupPage> createState() => _MotivationSetupPageState();
+}
+
+class _MotivationSetupPageState extends State<MotivationSetupPage> {
+  String? motivationMessage;
+  String challengeMessage = "";
+  int streak = 0; // daily streak
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRandomMotivation();
+    _generateDailyChallenge();
+    _loadStreak();
+  }
+
+  Future<void> _fetchRandomMotivation() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection("motivations")
+        .doc(widget.category)
+        .collection("texts")
+        .get();
+
+    final docs = snapshot.docs;
+    if (docs.isEmpty) {
+      setState(() {
+        motivationMessage = "Stay motivated!";
+      });
+      return;
+    }
+
+    final randomDoc = (docs..shuffle()).first;
+    setState(() {
+      motivationMessage = randomDoc["text"];
+    });
+  }
+
+  void _generateDailyChallenge() {
+    final challenges = [
+      "Write down one thing you'll do today to reach your goal.",
+      "Send a motivational message to a friend.",
+      "Take 5 minutes to visualize your ideal outcome.",
+      "Reflect on one success from this week.",
+      "List 3 small actions to improve yourself today."
+    ];
+    setState(() {
+      challengeMessage = (challenges..shuffle()).first;
+    });
+  }
+
+  Future<void> _loadStreak() async {
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(widget.username)
+        .get();
+
+    if (doc.exists && doc.data() != null) {
+      setState(() {
+        streak = doc.data()!['streak'] ?? 0;
+      });
+    }
+  }
+
+  Future<void> _incrementStreak() async {
+    final docRef =
+        FirebaseFirestore.instance.collection("users").doc(widget.username);
+    final doc = await docRef.get();
+
+    DateTime today = DateTime.now();
+    String todayStr = "${today.year}-${today.month}-${today.day}";
+
+    if (doc.exists && doc.data() != null) {
+      final lastCompleted = doc.data()!['lastChallengeDate'] ?? "";
+      if (lastCompleted == todayStr) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("You've already completed today's challenge!"),
+            backgroundColor: Colors.orange,
           ),
+        );
+        return;
+      }
+    }
 
-          const SizedBox(height: 30),
+    // Increment streak
+    setState(() {
+      streak += 1;
+    });
 
-          // Save button
-          ElevatedButton(
-            onPressed: () {
-              // For now just show a confirmation
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    "Motivation time set to ${selectedTime.format(context)}",
+    // Update Firestore
+    await docRef.update({
+      'streak': streak,
+      'lastChallengeDate': todayStr,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 🎉 Celebration Icon
+              Icon(Icons.celebration, size: 100, color: MotivoApp.primary),
+              const SizedBox(height: 20),
+
+              // 💬 Motivational message
+              if (motivationMessage != null)
+                Text(
+                  motivationMessage!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
+                ),
+              const SizedBox(height: 30),
+
+              // 🔥 Daily Streak
+              Text(
+                "Your Daily Streak: $streak 🔥",
+                style: GoogleFonts.poppins(
+                    fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 20),
+
+              // 📌 Daily Challenge
+              Text(
+                "Today's Challenge:",
+                style: GoogleFonts.poppins(
+                    fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                challengeMessage,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 30),
+
+              // 🌐 Share Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const FaIcon(FontAwesomeIcons.whatsapp),
+                    label: const Text("WhatsApp"),
+                    onPressed: () async {
+                      final text = Uri.encodeComponent(
+                          motivationMessage ?? "Stay motivated!");
+                      final url = Uri.parse("https://wa.me/?text=$text");
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    icon: const FaIcon(FontAwesomeIcons.facebook),
+                    label: const Text("Facebook"),
+                    onPressed: () async {
+                      final text = Uri.encodeComponent(
+                          motivationMessage ?? "Stay motivated!");
+                      final url = Uri.parse(
+                          "https://www.facebook.com/sharer/sharer.php?u=&quote=$text");
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.share),
+                    label: const Text("Other"),
+                    onPressed: () async {
+                      final text = motivationMessage ?? "Stay motivated!";
+                      final url =
+                          Uri.parse("mailto:?subject=Motivation&body=$text");
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url);
+                      }
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 40),
+
+              // ✅ Mark Challenge Done (to increment streak)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   backgroundColor: MotivoApp.primary,
                 ),
-              );
-            },
-            child: const Text("Save"),
+                onPressed: _incrementStreak,
+                child: const Text(
+                  "I Completed Today's Challenge",
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

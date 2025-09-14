@@ -33,5 +33,4 @@ MotivationMate is a Flutter-based mobile app that delivers **daily motivational 
 - **intl** package – For language localization and translation management  
 
 
-git clone https://github.com/your-username/MotivationMate.git
-cd MotivationMate
+
